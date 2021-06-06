@@ -28,13 +28,17 @@ public class FilterTree extends AbstractClassifier {
         return null;
     }
 
-    public double InformationGain(ArrayList<Integer> values, int total){
+    public double informationGain(int[] left, int[] right){
+        int leftSum = left[0] + left[1];
+        int rightSum = right[0] + right[1];
+        int total = leftSum + rightSum;
 
+        return ((leftSum / total) * entropy(left)) + ((rightSum / total) * entropy(right));
     }
 
-    public double entropy(int value1, int value2){
-        int sum = value1 + value2;
-        return -(value1/sum) * logBase2(value1/sum) - (value2/sum) * logBase2(value2/sum);
+    public double entropy(int[] values){
+        int sum = values[0] + values[1];
+        return -(values[0]/sum) * logBase2(values[0]/sum) - (values[1]/sum) * logBase2(values[1]/sum);
     }
 
     public double logBase2(double value){
