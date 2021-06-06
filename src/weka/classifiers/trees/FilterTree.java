@@ -15,17 +15,21 @@ public class FilterTree extends AbstractClassifier {
     private class TreeNode{
         public TreeNode leftBranch;
         public TreeNode rightBranch;
+        public TreeNode parentNode;
 
         public Attribute attribute;
         public double splitPoint;
+        public double info;
 
         public Instances instances;
 
         public TreeNode(Instances instances){
+            for(int i = 0; i < instances.numAttributes(); i++){
 
+            }
         }
 
-        public double FindBestSplitPointForAttribute(Attribute attribute, Instances instances){
+        public double[] FindBestSplitPointForAttribute(Attribute attribute, Instances instances){
             int numAttributes = instances.numAttributes();
 
             for(int i = 0; i < numAttributes; i++){
@@ -34,8 +38,14 @@ public class FilterTree extends AbstractClassifier {
                 SortByAttribute(currentAttribute, instances, newInstances);
 
                 double[] bestSplitPoint = FindBestSplitPoint(currentAttribute, newInstances);
-                double bestSplitPointValue = bestSplitPoint[0];
-                double bestSplitPointIndex = bestSplitPoint[1];
+
+                // Stopping criteria
+                if(parentNode != null && (parentNode.info - bestSplitPoint[2] == 0)){
+                    // TODO: STOP
+                }
+                else{
+                    return bestSplitPoint;
+                }
 
             }
         }
@@ -71,7 +81,7 @@ public class FilterTree extends AbstractClassifier {
 
                     double infoGain = informationGain(leftMapArray, rightMapArray);
 
-                    if(bestSplitPointIndex == -1 || infoGain > bestInformationGain){
+                    if(bestSplitPointIndex == -1 || infoGain < bestInformationGain){
                         bestInformationGain = infoGain;
                         bestSplitPoint = (instances.instance(i).value(currentAttribute) + instances.instance(i+1).value(currentAttribute)) / 2;
                         bestSplitPointIndex = i;
@@ -79,7 +89,7 @@ public class FilterTree extends AbstractClassifier {
                 }
             }
 
-            return new double[] {bestSplitPoint, bestSplitPointIndex};
+            return new double[] {bestSplitPoint, bestSplitPointIndex, bestInformationGain};
         }
 
         // Sorts by a given attribute
