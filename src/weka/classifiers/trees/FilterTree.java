@@ -4,19 +4,22 @@ import weka.classifiers.AbstractClassifier;
 import weka.core.Attribute;
 import weka.core.Instance;
 import weka.core.Instances;
+import weka.core.OptionMetadata;
 import weka.filters.AllFilter;
 import weka.filters.Filter;
 
+import java.io.Serializable;
 import java.util.*;
 
-public class FilterTree extends AbstractClassifier {
+public class FilterTree extends AbstractClassifier implements Serializable {
 
+//    private static final long serialVersionUID = 658362L;
     protected TreeNode filterTree;
 
     private int LEAFCOUNTER = 0;
     private int SPLITTERCOUNTER = 0;
 
-    private class TreeNode{
+    private class TreeNode implements Serializable{
         public TreeNode leftBranch;
         public TreeNode rightBranch;
         public TreeNode parentNode;
@@ -41,7 +44,7 @@ public class FilterTree extends AbstractClassifier {
             this.splitPoint= (double)result[1];
             this.info = (double)result[2];
 
-            if(instances.size() <= m_minimumNumberOfInstancesToStop || (this.parentNode != null && this.parentNode.info - this.info == 0)){
+            if(instances.size() <= getMinimumNumberOfInstancesToStop() || (this.parentNode != null && this.parentNode.info - this.info == 0)){
                 int[] countArray = new int[instances.numClasses()];
                 this.predictedProbabilities = new double[instances.numClasses()];
 
@@ -119,7 +122,7 @@ public class FilterTree extends AbstractClassifier {
             int[] rightClassCount = new int[sortedInstances.numClasses()];
 
             double bestSplitPointValue = 0;
-            double bestInformationGain = 0;
+            double bestInformationGain = Double.POSITIVE_INFINITY;
             int bestSplitPointIndex = -1;
 
             // Initialising
@@ -177,11 +180,8 @@ public class FilterTree extends AbstractClassifier {
 
         public double[] classify(Instance instance) throws Exception{
             if(this.predictedProbabilities == null){
-                Instances tempInstances = new Instances((Instances)null, 1);
-                tempInstances.add(instance);
-
-                Instances filteredInstances = Filter.useFilter(tempInstances, this.localFilter);
-                Instance filteredInstance = filteredInstances.instance(0);
+                this.localFilter.input(instance);
+                Instance filteredInstance = this.localFilter.output();
 
                 double instanceValueOfSplitAttribute = filteredInstance.value(this.attribute);
 
@@ -199,12 +199,24 @@ public class FilterTree extends AbstractClassifier {
     }
 
     // Sets the minimum number of instances required to stop growth
+
     protected int m_minimumNumberOfInstancesToStop = 1;
+    @OptionMetadata(
+            displayName = "minNumInstancesForLeafNode",
+            description = "Minimum number of instances for a leaf node", displayOrder = 1,
+            commandLineParamName = "M",
+            commandLineParamSynopsis = "-M <>")
     public void setMinimumNumberOfInstancesToStop(int min){ m_minimumNumberOfInstancesToStop = min;}
     public int getMinimumNumberOfInstancesToStop(){return m_minimumNumberOfInstancesToStop;}
 
     // Sets the filter to use at each node of the tree
+
     protected Filter m_Filter = new AllFilter();
+    @OptionMetadata(
+            displayName = "Filter",
+            description = "The filter to use", displayOrder = 2,
+            commandLineParamName = "F",
+            commandLineParamSynopsis = "-F <filter specification>")
     public void setFilter(Filter filter){m_Filter = filter;};
     public Filter getFilter(){return m_Filter;}
 
