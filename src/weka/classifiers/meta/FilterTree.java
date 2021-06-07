@@ -10,31 +10,23 @@ import java.io.Serializable;
 import java.util.*;
 
 public class FilterTree extends RandomizableClassifier implements Serializable {
+        private class TreeNode implements Serializable{
+        // References to related TreeNodes
+        private TreeNode leftBranch;
+        private TreeNode rightBranch;
+        private TreeNode parentNode;
 
-//    private static final long serialVersionUID = 658362L;
-    protected TreeNode filterTree;
-
-    private int LEAFCOUNTER = 0;
-    private int SPLITTERCOUNTER = 0;
-
-    private Random m_random;
-
-    private class TreeNode implements Serializable{
-        public TreeNode leftBranch;
-        public TreeNode rightBranch;
-        public TreeNode parentNode;
-
+        // Values that the tree node needs to remember
         public Attribute attribute;
         public double splitPoint;
         public double info;
-
-        public Filter localFilter;
-
         public double[] predictedProbabilities = null;
+        public Filter localFilter;
 
         public TreeNode(Instances instances, TreeNode parent) throws Exception{
             this.parentNode = parent;
 
+            // Creates a new local filter
             this.localFilter = Filter.makeCopy(m_Filter);
             if(this.localFilter instanceof Randomizable){
                 ((Randomizable)this.localFilter).setSeed(m_random.nextInt());
@@ -58,7 +50,6 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
                     createLeafNode(instances);
                 }
                 else{
-
                     Instances[] newInstances = distributeInstancesAcrossBranches(filteredInstances, instances);
                     Instances leftInstances = newInstances[0];
                     Instances rightInstances = newInstances[1];
@@ -67,31 +58,32 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
                     this.rightBranch = new TreeNode(rightInstances, this);
                 }
             }
-
         }
 
+        // Creates a new leaf node with the given instances
         private void createLeafNode(Instances instances){
             int[] countArray = new int[instances.numClasses()];
             this.predictedProbabilities = new double[instances.numClasses()];
 
+            // Adds up the counts of each class values
             for(int i = 0; i < instances.size(); i++){
                 countArray[(int)instances.instance(i).classValue()] ++;
             }
 
+            // Converts the counts into probabilites
             for(int i = 0; i < this.predictedProbabilities.length; i++){
                 this.predictedProbabilities[i] = countArray[i] / (double)instances.size();
             }
-
-            System.out.println("l, " + LEAFCOUNTER);
-            LEAFCOUNTER++;
         }
 
+        // Distributes the instances based on the split point
         private Instances[] distributeInstancesAcrossBranches(Instances filteredInstances, Instances instances){
             // We have the best attribute to split on now
             Instances leftInstances = new Instances(instances, 0);
             Instances rightInstances = new Instances(instances, 0);
 
             for(int i = 0; i < instances.size(); i++){
+                // Puts all values less than or equal to the split value in the left branch
                 if(filteredInstances.instance(i).value(this.attribute) <= this.splitPoint){
                     leftInstances.add(instances.instance(i));
                 }
@@ -103,6 +95,7 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
             return new Instances[] {leftInstances, rightInstances};
         }
 
+        // Finds the best split point for all attributes
         public Object[] FindBestSplitPointForAllAttributes(Instances filteredInstances) throws Exception{
             Attribute bestAttribute = null;
             double bestSplitPointValue = 0;
@@ -110,8 +103,8 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
 
             int numAttributes = filteredInstances.numAttributes();
             int classIndex = filteredInstances.classIndex();
+            // Finds the best split point for each attribute
             for(int i = 0; i < numAttributes; i++){
-//                if(filteredInstances.classAttribute().equals(filteredInstances.attribute(i))){
                 if(i != classIndex){
                     double[] result = FindBestSplitPointForGivenAttribute(filteredInstances.attribute(i), filteredInstances);
                     if(result != null){
@@ -119,6 +112,7 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
                         double splitPointIndex = result[1];
                         double informationGain = result[2];
 
+                        // If the new information gain value is better
                         if(bestAttribute == null || bestInfo > informationGain){
                             bestAttribute = filteredInstances.attribute(i);
                             bestSplitPointValue = splitPointValue;
@@ -136,6 +130,7 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
             }
         }
 
+        // Finds the best split point for a given attribute
         private double[] FindBestSplitPointForGivenAttribute(Attribute currentAttribute, Instances instances){
             Instances sortedInstances = SortByAttribute(currentAttribute, instances);
             int[] leftClassCount = new int[sortedInstances.numClasses()];
@@ -151,15 +146,18 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
                 rightClassCount[(int)classValue]++;
             }
 
+            // Checks each possible split point
             for(int i = 0; i < sortedInstances.size() - 1; i++){
                 // Recalculate class counts
                 double classValue = sortedInstances.instance(i).classValue();
                 leftClassCount[(int)classValue]++;
                 rightClassCount[(int)classValue]--;
 
+                // if the two adjacent values are identical
                 if(sortedInstances.instance(i).value(currentAttribute) != sortedInstances.instance(i+1).value(currentAttribute)){
                     double infoGain = informationGain(leftClassCount, rightClassCount);
                     double newSplitPoint = (sortedInstances.instance(i).value(currentAttribute) + sortedInstances.instance(i+1).value(currentAttribute)) / 2;
+                    // If the new best info should be changed
                     if((bestSplitPointIndex == -1 || infoGain < bestInformationGain) && newSplitPoint != sortedInstances.instance(i).value(currentAttribute)
                             && newSplitPoint != sortedInstances.instance(i+1).value(currentAttribute)){
                         bestInformationGain = infoGain;
@@ -183,6 +181,7 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
             Instances oldInstances =  new Instances(instances, 0, instances.size());
             Instances newInstances = new Instances(oldInstances, 0);
             int iterations = oldInstances.size();
+            // Finds the smallest value of the instance at the given attribute, and adds it to the new instancces
             for(int i = 0; i < iterations; i++){
                 Double smallestValue = Double.NaN;
                 Instance smallestInstance = null;
@@ -204,13 +203,16 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
             return newInstances;
         }
 
+        // classifies a given instance
         public double[] classify(Instance instance) throws Exception{
+            // If the current node is a non leaf node
             if(this.predictedProbabilities == null){
+                // Filter the instance
                 this.localFilter.input(instance);
                 Instance filteredInstance = this.localFilter.output();
 
+                // Decide which split branch to go down
                 double instanceValueOfSplitAttribute = filteredInstance.value(this.attribute);
-
                 if(instanceValueOfSplitAttribute <= this.splitPoint){
                     return this.leftBranch.classify(instance);
                 }
@@ -224,7 +226,9 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
         }
     }
 
-    // Sets the minimum number of instances required to stop growth
+    private static final long serialVersionUID = 6583114962L;
+    private TreeNode filterTree;
+    private Random m_random;
 
     protected int m_minimumNumberOfInstancesToStop = 1;
     @OptionMetadata(
@@ -257,8 +261,9 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
         return filterTree.classify(var1);
     }
 
-    // Calculates the information gain on a binary split
+    // Calculates the information on a binary split
     public double informationGain(int[] left, int[] right){
+        // Calculate the sums of the splits
         int leftSum = 0;
         for(int val: left){
             leftSum += val;
@@ -269,12 +274,13 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
         }
         double total = leftSum + rightSum;
 
+        // Calculate the entropy of each split
         double leftEntropy = entropy(left, leftSum);
         double rightEntropy = entropy(right, rightSum);
         return ((leftSum / total) * leftEntropy) + ((rightSum / total) * rightEntropy);
     }
 
-    // Calculates the
+    // Calculates the entropy of a set of values
     public double entropy(int[] values, int total){
         double result = 0;
         for(int val: values){
@@ -284,20 +290,14 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
         return result;
     }
 
+    // calculaes the log base 2 of a given value
     public double logBase2(double value){
+        // defines log(0) as 0
         if(value == 0.0){
             return 0.0;
         }
         else{
             return Math.log(value)/Math.log(2);
         }
-    }
-
-    public int[] ConvertObjectArray(Object[] objectArray){
-        int[] returnArray = new int[objectArray.length];
-        for(int i = 0; i < objectArray.length; i++){
-            returnArray[i] = (int)objectArray[i];
-        }
-        return returnArray;
     }
 }
