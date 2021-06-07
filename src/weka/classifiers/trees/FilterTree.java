@@ -12,6 +12,8 @@ import java.util.*;
 
 public class FilterTree extends AbstractClassifier {
 
+    protected TreeNode filterTree;
+
     private class TreeNode{
         public TreeNode leftBranch;
         public TreeNode rightBranch;
@@ -21,40 +23,83 @@ public class FilterTree extends AbstractClassifier {
         public double splitPoint;
         public double info;
 
-        public Instances instances;
+        public Filter localFilter;
 
-        public TreeNode(Instances instances){
-            for(int i = 0; i < instances.numAttributes(); i++){
+        public double[] predictedProbabilities = null;
 
+        public TreeNode(Instances instances, TreeNode parent) throws Exception{
+            this.localFilter = Filter.makeCopy(m_Filter);
+            this.localFilter.setInputFormat(instances);
+
+            this.parentNode = parent;
+
+            Attribute bestAttribute = null;
+            double bestSplitPointValue = 0;
+            double bestInfo = 0;
+
+            Instances filteredInstances = Filter.useFilter(instances, this.localFilter);
+            int numAttributes = filteredInstances.numAttributes();
+            for(int i = 0; i < numAttributes; i++){
+                if(filteredInstances.classAttribute().equals(filteredInstances.attribute(i))){
+                    double[] result = FindBestSplitPoint(filteredInstances.attribute(i), filteredInstances);
+                    double splitPointValue = result[0];
+                    double splitPointIndex = result[1];
+                    double informationGain = result[2];
+
+                    if(bestAttribute == null || bestInfo > informationGain){
+                        bestAttribute = filteredInstances.attribute(i);
+                        bestSplitPointValue = splitPointValue;
+                        bestInfo = informationGain;
+                    }
+                }
+            }
+
+            if(instances.size() <= m_minimumNumberOfInstancesToStop || (this.parentNode != null && this.parentNode.info - bestInfo == 0)){
+                int[] countArray = new int[instances.numClasses()];
+                this.predictedProbabilities = new double[instances.numClasses()];
+
+                for(int i = 0; i < instances.size(); i++){
+                    countArray[(int)instances.instance(i).classValue()] ++;
+                }
+
+                for(int i = 0; i < this.predictedProbabilities.length; i++){
+                    this.predictedProbabilities[i] = countArray[i] / instances.size();
+                }
+            }
+            else{
+                this.info = bestInfo;
+
+                // We have the best attribute to split on now
+                Instances leftInstances = new Instances(instances);
+                Instances rightInstances = new Instances(instances);
+
+                for(int i = 0; i < instances.size(); i++){
+                    if(instances.instance(i).value(bestAttribute) < bestSplitPointValue){
+                        leftInstances.add(instances.instance(i));
+                    }
+                    else{
+                        rightInstances.add(instances.instance(i));
+                    }
+                }
+
+                this.leftBranch = new TreeNode(leftInstances, this);
+                this.rightBranch = new TreeNode(rightInstances, this);
             }
         }
 
         public double[] FindBestSplitPointForAttribute(Attribute attribute, Instances instances){
-            int numAttributes = instances.numAttributes();
-
-            for(int i = 0; i < numAttributes; i++){
-                Instances newInstances = new Instances(instances, instances.size());
-                Attribute currentAttribute = instances.attribute(i);
-                SortByAttribute(currentAttribute, instances, newInstances);
-
-                double[] bestSplitPoint = FindBestSplitPoint(currentAttribute, newInstances);
-
-                // Stopping criteria
-                if(parentNode != null && (parentNode.info - bestSplitPoint[2] == 0)){
-                    // TODO: STOP
-                }
-                else{
-                    return bestSplitPoint;
-                }
-
-            }
+            Instances newInstances = new Instances(instances, instances.size());
+            SortByAttribute(attribute, instances, newInstances);
+            double[] bestSplitPoint = FindBestSplitPoint(attribute, newInstances);
+            instances = newInstances;
+            return bestSplitPoint;
         }
 
         private double[] FindBestSplitPoint(Attribute currentAttribute, Instances instances){
             Map<Double, Integer> leftMap = new HashMap<Double, Integer>();
             Map<Double, Integer> rightMap = new HashMap<Double, Integer>();
 
-            double bestSplitPoint = 0;
+            double bestSplitPointValue = 0;
             double bestInformationGain = 0;
             int bestSplitPointIndex = -1;
 
@@ -83,13 +128,13 @@ public class FilterTree extends AbstractClassifier {
 
                     if(bestSplitPointIndex == -1 || infoGain < bestInformationGain){
                         bestInformationGain = infoGain;
-                        bestSplitPoint = (instances.instance(i).value(currentAttribute) + instances.instance(i+1).value(currentAttribute)) / 2;
+                        bestSplitPointValue = (instances.instance(i).value(currentAttribute) + instances.instance(i+1).value(currentAttribute)) / 2;
                         bestSplitPointIndex = i;
                     }
                 }
             }
 
-            return new double[] {bestSplitPoint, bestSplitPointIndex, bestInformationGain};
+            return new double[] {bestSplitPointValue, bestSplitPointIndex, bestInformationGain};
         }
 
         // Sorts by a given attribute
@@ -114,6 +159,28 @@ public class FilterTree extends AbstractClassifier {
                 newInstances.add(smallestInstance);
             }
         }
+
+        public double[] classify(Instance instance) throws Exception{
+            if(this.predictedProbabilities == null){
+                Instances tempInstances = new Instances((Instances)null, 1);
+                tempInstances.add(instance);
+
+                Instances filteredInstances = Filter.useFilter(tempInstances, this.localFilter);
+                Instance filteredInstance = filteredInstances.instance(0);
+
+                double instanceValueOfSplitAttribute = filteredInstance.value(this.attribute);
+
+                if(instanceValueOfSplitAttribute <= this.splitPoint){
+                    return this.leftBranch.classify(instance);
+                }
+                else{
+                    return this.rightBranch.classify(instance);
+                }
+            }
+            else{
+                return this.predictedProbabilities;
+            }
+        }
     }
 
     // Sets the minimum number of instances required to stop growth
@@ -128,11 +195,12 @@ public class FilterTree extends AbstractClassifier {
 
     @Override
     public void buildClassifier(Instances instances) throws Exception {
-
+        filterTree = new TreeNode(instances, null);
     }
 
-    public double[] distributionForInstance(Instances instances) throws Exception {
-        return null;
+    @Override
+    public double[] distributionForInstance(Instance var1) throws Exception {
+        return filterTree.classify(var1);
     }
 
     // Calculates the information gain on a binary split
