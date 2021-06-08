@@ -10,18 +10,19 @@ import java.io.Serializable;
 import java.util.*;
 
 public class FilterTree extends RandomizableClassifier implements Serializable {
-        private class TreeNode implements Serializable{
+    protected class TreeNode implements Serializable{
         // References to related TreeNodes
-        private TreeNode leftBranch;
-        private TreeNode rightBranch;
-        private TreeNode parentNode;
+        protected TreeNode leftBranch;
+        protected TreeNode rightBranch;
+        protected TreeNode parentNode;
 
         // Values that the tree node needs to remember
-        public Attribute attribute;
-        public double splitPoint;
-        public double info;
-        public double[] predictedProbabilities = null;
-        public Filter localFilter;
+        protected Attribute attribute;
+        protected double splitPoint;
+        protected double info;
+        protected int[] predictedCounts = null;
+        protected double[] predictedProbabilities = null;
+        protected Filter localFilter;
 
         public TreeNode(Instances instances, TreeNode parent) throws Exception{
             this.parentNode = parent;
@@ -61,23 +62,23 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
         }
 
         // Creates a new leaf node with the given instances
-        private void createLeafNode(Instances instances){
-            int[] countArray = new int[instances.numClasses()];
+        protected void createLeafNode(Instances instances){
+            this.predictedCounts = new int[instances.numClasses()];
             this.predictedProbabilities = new double[instances.numClasses()];
 
             // Adds up the counts of each class values
             for(int i = 0; i < instances.size(); i++){
-                countArray[(int)instances.instance(i).classValue()] ++;
+                this.predictedCounts[(int)instances.instance(i).classValue()] ++;
             }
 
             // Converts the counts into probabilites
             for(int i = 0; i < this.predictedProbabilities.length; i++){
-                this.predictedProbabilities[i] = countArray[i] / (double)instances.size();
+                this.predictedProbabilities[i] = this.predictedCounts[i] / (double)instances.size();
             }
         }
 
         // Distributes the instances based on the split point
-        private Instances[] distributeInstancesAcrossBranches(Instances filteredInstances, Instances instances){
+        protected Instances[] distributeInstancesAcrossBranches(Instances filteredInstances, Instances instances){
             // We have the best attribute to split on now
             Instances leftInstances = new Instances(instances, 0);
             Instances rightInstances = new Instances(instances, 0);
@@ -96,7 +97,7 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
         }
 
         // Finds the best split point for all attributes
-        public Object[] FindBestSplitPointForAllAttributes(Instances filteredInstances) throws Exception{
+        protected Object[] FindBestSplitPointForAllAttributes(Instances filteredInstances) throws Exception{
             Attribute bestAttribute = null;
             double bestSplitPointValue = 0;
             double bestInfo = 0;
@@ -131,7 +132,7 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
         }
 
         // Finds the best split point for a given attribute
-        private double[] FindBestSplitPointForGivenAttribute(Attribute currentAttribute, Instances instances){
+        protected double[] FindBestSplitPointForGivenAttribute(Attribute currentAttribute, Instances instances){
             Instances sortedInstances = SortByAttribute(currentAttribute, instances);
             int[] leftClassCount = new int[sortedInstances.numClasses()];
             int[] rightClassCount = new int[sortedInstances.numClasses()];
@@ -177,7 +178,7 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
         }
 
         // Sorts by a given attribute
-        private Instances SortByAttribute(Attribute currentAttribute, Instances instances){
+        protected Instances SortByAttribute(Attribute currentAttribute, Instances instances){
             Instances oldInstances =  new Instances(instances, 0, instances.size());
             Instances newInstances = new Instances(oldInstances, 0);
             int iterations = oldInstances.size();
@@ -204,7 +205,7 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
         }
 
         // classifies a given instance
-        public double[] classify(Instance instance) throws Exception{
+        protected double[] classify(Instance instance) throws Exception{
             // If the current node is a non leaf node
             if(this.predictedProbabilities == null){
                 // Filter the instance
@@ -224,11 +225,59 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
                 return this.predictedProbabilities;
             }
         }
+
+        @Override
+        public String toString() {
+            return this.toStringLevel(0);
+        }
+
+        protected String toStringLevel(int level){
+            String spaceString = spaceString(level);
+            // If the current node is a splitter node
+            if(this.predictedProbabilities == null){
+                return "\n" + spaceString + this.attribute.name() + " <= " + round(this.splitPoint, m_numDecimalPlaces)
+                        + this.leftBranch.toStringLevel(level + 1)+ "\n"
+                        + spaceString + this.attribute.name() + " > " + round(this.splitPoint, m_numDecimalPlaces)
+                        + this.rightBranch.toStringLevel(level + 1);
+            }
+            else{
+                return ": " + countArrayString();
+            }
+        }
+
+        // Turns the count arrays into a string
+        private String countArrayString(){
+            String returnString = "";
+            for(int i = 0; i < this.predictedCounts.length; i++){
+                returnString += this.predictedCounts[i] + " ";
+            }
+            return returnString;
+        }
+
+        // Creates the padding string for the toString
+        private String spaceString(int level){
+            String returnString = "";
+            String spaceCharacter = "|  ";
+            for(int i = 0; i < level; i++){
+                returnString += spaceCharacter;
+            }
+            return returnString;
+        }
+
+        // Rounds the number value to the given number of decimal places
+        private double round(double value, int places) {
+            if (places < 0) throw new IllegalArgumentException();
+
+            long factor = (long) Math.pow(10, places);
+            value = value * factor;
+            long tmp = Math.round(value);
+            return (double) tmp / factor;
+        }
     }
 
-    private static final long serialVersionUID = 6583114962L;
-    private TreeNode filterTree;
-    private Random m_random;
+    public static final long serialVersionUID = 6583114962L;
+    protected TreeNode filterTree;
+    protected Random m_random;
 
     protected int m_minimumNumberOfInstancesToStop = 1;
     @OptionMetadata(
@@ -262,7 +311,7 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
     }
 
     // Calculates the information on a binary split
-    public double informationGain(int[] left, int[] right){
+    protected double informationGain(int[] left, int[] right){
         // Calculate the sums of the splits
         int leftSum = 0;
         for(int val: left){
@@ -281,7 +330,7 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
     }
 
     // Calculates the entropy of a set of values
-    public double entropy(int[] values, int total){
+    protected double entropy(int[] values, int total){
         double result = 0;
         for(int val: values){
             double dVal = (double)val;
@@ -291,7 +340,7 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
     }
 
     // calculaes the log base 2 of a given value
-    public double logBase2(double value){
+    protected double logBase2(double value){
         // defines log(0) as 0
         if(value == 0.0){
             return 0.0;
@@ -299,5 +348,10 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
         else{
             return Math.log(value)/Math.log(2);
         }
+    }
+
+    @Override
+    public String toString(){
+        return this.filterTree.toString();
     }
 }
