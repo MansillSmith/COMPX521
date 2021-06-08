@@ -268,6 +268,7 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
     protected TreeNode filterTree;
     protected Random m_random;
 
+    // The minimum nummber of instances required for splitting
     protected int m_minimumNumberOfInstancesToStop = 1;
     @OptionMetadata(
             displayName = "minNumInstancesForLeafNode",
@@ -278,7 +279,6 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
     public int getMinimumNumberOfInstancesToStop(){return m_minimumNumberOfInstancesToStop;}
 
     // Sets the filter to use at each node of the tree
-
     protected Filter m_Filter = new AllFilter();
     @OptionMetadata(
             displayName = "Filter",
@@ -297,6 +297,29 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
     @Override
     public double[] distributionForInstance(Instance var1) throws Exception {
         return filterTree.classify(var1);
+    }
+
+    /**
+     * Returns a string describing this classifier
+     *
+     * @return a description of the classifier suitable for
+     * displaying in the explorer/experimenter gui
+     */
+    public String globalInfo() {
+        return "Class for building a classification tree with local filter models for definining splits.";
+    }
+
+    /**
+     * Returns default capabilities of the classifier.
+     *
+     * @return the capabilities of this classifier
+     */
+    public Capabilities getCapabilities() {
+        Capabilities result = super.getCapabilities();
+        result.disableAll();
+        result.enable(Capabilities.Capability.NUMERIC_ATTRIBUTES);
+        result.enable(Capabilities.Capability.NOMINAL_CLASS);
+        return result;
     }
 
     // Calculates the information on a binary split
