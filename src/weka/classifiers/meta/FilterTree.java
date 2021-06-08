@@ -228,17 +228,16 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
 
         @Override
         public String toString() {
-            return this.toStringLevel(0);
+            return this.toStringLevel("");
         }
 
-        protected String toStringLevel(int level){
-            String spaceString = spaceString(level);
+        protected String toStringLevel(String spaceString){
             // If the current node is a splitter node
             if(this.predictedProbabilities == null){
                 return "\n" + spaceString + this.attribute.name() + " <= " + round(this.splitPoint, m_numDecimalPlaces)
-                        + this.leftBranch.toStringLevel(level + 1)+ "\n"
+                        + this.leftBranch.toStringLevel(spaceString + "|  ")+ "\n"
                         + spaceString + this.attribute.name() + " > " + round(this.splitPoint, m_numDecimalPlaces)
-                        + this.rightBranch.toStringLevel(level + 1);
+                        + this.rightBranch.toStringLevel(spaceString + "|  ");
             }
             else{
                 return ": " + countArrayString();
@@ -250,16 +249,6 @@ public class FilterTree extends RandomizableClassifier implements Serializable {
             String returnString = "";
             for(int i = 0; i < this.predictedCounts.length; i++){
                 returnString += this.predictedCounts[i] + " ";
-            }
-            return returnString;
-        }
-
-        // Creates the padding string for the toString
-        private String spaceString(int level){
-            String returnString = "";
-            String spaceCharacter = "|  ";
-            for(int i = 0; i < level; i++){
-                returnString += spaceCharacter;
             }
             return returnString;
         }
